@@ -20,10 +20,10 @@ def parse_record(record: ET.Element) -> str:
         if element.tag == "row":
             for node in element:
                 if node.tag == "source_ip":
-                    ip = node.text
+                    ip = node.text or ""
                     continue
                 if node.tag == "count":
-                    count = node.text
+                    count = node.text or ""
                     continue
                 if node.tag == "policy_evaluated":
                     for item in node:
@@ -34,7 +34,7 @@ def parse_record(record: ET.Element) -> str:
                 if node.tag == fail:
                     for item in node:
                         if item.tag == "domain":
-                            domain = item.text
+                            domain = item.text or ""
                             continue
                         if item.tag == "result":
                             auth_pass = item.text == "pass"
