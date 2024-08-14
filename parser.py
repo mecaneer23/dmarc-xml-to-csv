@@ -6,11 +6,43 @@ from argparse import ArgumentParser
 import xml.etree.ElementTree as ET
 
 
+def parse_row(row: ET.Element) -> tuple[str, str, str]:
+    """Parse a single row from a DMARC report"""
+    ip = ""
+    count = ""
+    fail = ""
+    for node in row:
+        if node.tag == "source_ip":
+            ip = node.text or ""
+            continue
+        if node.tag == "count":
+            count = node.text or ""
+            continue
+        if node.tag == "policy_evaluated":
+            for item in node:
+                if item.text == "fail":
+                    fail += item.tag
+    return (ip, fail, count)
+
+
+def parse_auth_results(auth_results: ET.Element, fail: str) -> tuple[bool, str]:
+    """Parse the auth results"""
+    auth_pass = True
+    domain = ""
+    for node in auth_results:
+        if node.tag != fail:
+            continue
+        for item in node:
+            if item.tag == "domain":
+                domain = item.text or ""
+                continue
+            if item.tag == "result":
+                auth_pass = item.text == "pass"
+    return (auth_pass, domain)
+
+
 def parse_record(record: ET.Element) -> str:
-    """
-    This function is stupidly written but I don't feel
-    like figuring out how to do it the right way
-    """
+    """Parse all necessary information and return as a csv string"""
     ip = ""
     fail = ""
     count = ""
@@ -18,27 +50,9 @@ def parse_record(record: ET.Element) -> str:
     domain = ""
     for element in record:
         if element.tag == "row":
-            for node in element:
-                if node.tag == "source_ip":
-                    ip = node.text or ""
-                    continue
-                if node.tag == "count":
-                    count = node.text or ""
-                    continue
-                if node.tag == "policy_evaluated":
-                    for item in node:
-                        if item.text == "fail":
-                            fail += item.tag
+            ip, fail, count = parse_row(element)
         if element.tag == "auth_results":
-            for node in element:
-                if node.tag == fail:
-                    for item in node:
-                        if item.tag == "domain":
-                            domain = item.text or ""
-                            continue
-                        if item.tag == "result":
-                            auth_pass = item.text == "pass"
-                            continue
+            auth_pass, domain = parse_auth_results(element, fail)
     return ",".join([ip, fail, count, str(auth_pass), domain])
 
 
@@ -48,7 +62,7 @@ def parse_report(root: ET.Element) -> str:
     for element in root:
         if element.tag == "record":
             csv = parse_record(element)
-            if csv.split(",")[1]:
+            if csv.split(",")[1]:  # if the record failed
                 all_csv.append(csv)
     return "\n".join(all_csv)
 
